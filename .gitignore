@@ -1,0 +1,14 @@
+.env
+reference/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Tooling
+.idea/
+.vscode/
+
+# Test and local artifacts
+.pytest_cache/
+.mypy_cache/
