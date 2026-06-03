@@ -1,0 +1,7 @@
+ReAct 是 Reasoning and Acting 的缩写，表示推理与行动结合。
+
+在 ReAct 范式中，大模型会先输出 Thought，表示当前思考；然后输出 Action，表示要调用的工具；工具返回 Observation 后，模型继续推理，直到给出 Final Answer。
+
+ReAct 的优点是可以让 Agent 边思考边使用工具，适合搜索、计算、文件分析、问答和排错等任务。
+
+工程实现中，ReActAgent 通常需要工具注册中心、输出解析器、scratchpad 和执行轨迹记录。
