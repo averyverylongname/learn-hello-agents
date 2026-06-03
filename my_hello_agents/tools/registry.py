@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 from my_hello_agents.tools.base import Tool
+from my_hello_agents.core.exceptions import ToolNotFoundError
 
 
 class ToolRegistry:
@@ -15,7 +16,7 @@ class ToolRegistry:
 
     def get_tool(self, name: str) -> Tool:
         if name not in self._tools:
-            raise ValueError(f"工具不存在：{name}")
+            raise ToolNotFoundError(f"工具不存在：{name}")
 
         return self._tools[name]
 

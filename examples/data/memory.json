@@ -1,0 +1,12 @@
+[
+  {
+    "id": "2ec13575-79bd-49ed-af75-ba2408331ebd",
+    "content": "用户正在围绕 Hello-Agents 项目学习 Agent 开发，目前已经完成到第七章的复刻开发。",
+    "metadata": {
+      "type": "learning",
+      "project": "Hello-Agents",
+      "chapter": 7
+    },
+    "created_at": "2026-06-02T19:45:38"
+  }
+]

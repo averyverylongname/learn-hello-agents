@@ -8,6 +8,7 @@ from my_hello_agents.core.llm import HelloAgentsLLM
 from my_hello_agents.core.message import system_message, user_message
 from my_hello_agents.tools.registry import ToolRegistry
 from my_hello_agents.core.trace import TraceStep
+from my_hello_agents.core.context import ContextManager
 
 
 class ReActAgent(Agent):
@@ -18,7 +19,8 @@ class ReActAgent(Agent):
         name: str = "ReActAgent",
         system_prompt: str = "你是一个可以通过思考和调用工具解决问题的智能体。",
         max_steps: int = 5,
-        verbose: bool = True
+        verbose: bool = True,
+        context_manager: ContextManager | None = None
     ):
         super().__init__(
             name=name,
@@ -29,6 +31,7 @@ class ReActAgent(Agent):
         self.max_steps = max_steps
         self.verbose = verbose
         self.trace_steps: list[TraceStep] = []
+        self.context_manager = context_manager or ContextManager()
 
     def run(self, user_input: str) -> str:
         self.add_user_message(user_input)
@@ -38,9 +41,11 @@ class ReActAgent(Agent):
 
         for step in range(self.max_steps):
             conversation_history = self._format_conversation_history()
+            safe_scratchpad = self.context_manager.trim_scratchpad(scratchpad)
+
             prompt = self._build_prompt(
                 conversation_history=conversation_history,
-                scratchpad=scratchpad
+                scratchpad=safe_scratchpad
             )
 
             llm_output = self.llm.chat([
@@ -87,11 +92,16 @@ class ReActAgent(Agent):
 
             try:
                 tool = self.tool_registry.get_tool(action)
-                observation = tool.run(action_input)
-                error_msg = None
+                tool_result = tool.safe_run(action_input)
+
+                observation = tool_result.to_observation_text()
+                error_msg = None if tool_result.success else tool_result.error
+
             except Exception as e:
-                observation = f"工具调用失败：{e}"
+                observation = f"工具调用失败，错误信息：{e}"
                 error_msg = str(e)
+
+            safe_observation = self.context_manager.trim_observation(str(observation))
 
             self.trace_steps.append(
                 TraceStep(
@@ -99,7 +109,7 @@ class ReActAgent(Agent):
                     thought=thought,
                     action=action,
                     action_input=action_input,
-                    observation=str(observation),
+                    observation=str(safe_observation),
                     raw_output=llm_output,
                     error=error_msg
                 )
@@ -107,7 +117,7 @@ class ReActAgent(Agent):
 
             scratchpad += (
                 f"\n{llm_output}\n"
-                f"Observation: {observation}\n"
+                f"Observation: {safe_observation}\n"
             )
 
         fallback = "达到最大推理轮数，仍未得到最终答案。"
@@ -145,6 +155,11 @@ class ReActAgent(Agent):
             8. 涉及数学计算、当前时间、文本统计的问题，必须调用对应工具。
             9. 当用户要求读取、总结、分析文件内容时，必须优先调用 file_read。
             10. 当用户要求查找某个关键词、定位文本位置时，必须优先调用 file_search。
+            11. 当用户要求你“记住”“保存”“记录”某些信息时，必须调用 memory_write。
+            12. 当用户询问“你记住了什么”“之前记录了什么”时，必须调用 memory_read。
+            13. 当用户询问某个关键词相关记忆时，必须调用 memory_search。
+            14. 当用户询问知识库、文档资料、项目资料中的内容时，必须调用 rag_search。
+            15. 使用 rag_search 返回的内容回答时，要说明答案依据来自检索结果，不要编造检索结果之外的信息。
 
             对话历史：
             {conversation_history}
@@ -227,18 +242,4 @@ class ReActAgent(Agent):
         self.trace_steps = []
 
     def _format_conversation_history(self) -> str:
-        lines = []
-
-        for message in self.history:
-            if message.role == "system":
-                continue
-
-            if message.role == "user":
-                lines.append(f"用户：{message.content}")
-            elif message.role == "assistant":
-                lines.append(f"助手：{message.content}")
-
-        if not lines:
-            return "暂无历史对话。"
-
-        return "\n".join(lines)
+        return self.context_manager.format_history(self.history)
